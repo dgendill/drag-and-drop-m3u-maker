@@ -3,14 +3,23 @@
   <head>
     <meta charset="utf-8">
     <title>Drag and Drop Audio to M3Ur</title>
+    <script src="jsmediatags.js"></script>
+    <script src="app.js"></script>
+    <style>
+      * {
+        box-sizing:border-box;
+      }
+    </style>
+
   </head>
   <body>
 
 
 
-    <div id="dropzone" style="color:#555;font-size:30px;text-align:center;width:100%;height:600px;background:#fff2f2;border:1px dashed #000;">
+    <div id="dropzone" style="color:#555;font-size:30px;text-align:center;width:100%;height:300px;background:#fff2f2;border:1px dashed #000;">
       <p>Drag Audio Files Here</p>
     </div>
+    <textarea placeholder="M3U Will Appear Here" id="m3u" style="width:100%; height:500px;border:1px dashed #000;padding:20px;"></textarea>
 
   </body>
 </html>
