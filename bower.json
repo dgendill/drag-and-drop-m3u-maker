@@ -1,0 +1,22 @@
+{
+  "name": "m3uMaker",
+  "authors": [
+    "Dominick Gendill <dgendill@gmail.com>"
+  ],
+  "description": "",
+  "main": "",
+  "license": "MIT",
+  "homepage": "",
+  "ignore": [
+    "**/.*",
+    "node_modules",
+    "bower_components",
+    "test",
+    "tests"
+  ],
+  "dependencies": {
+    "purescript-prelude": "^3.0.0",
+    "purescript-dom": "^4.5.0",
+    "purescript-aff": "^3.1.0"
+  }
+}
