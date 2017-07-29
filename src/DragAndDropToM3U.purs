@@ -6,6 +6,7 @@ import Control.Monad.Aff (Aff, launchAff, runAff)
 import Control.Monad.Eff (Eff)
 import Control.Monad.Eff.Class (liftEff)
 import Control.Monad.Eff.Console (CONSOLE, log, logShow)
+import Control.Monad.Eff.Exception (message)
 import DOM (DOM)
 import DOM.Event.Event (Event, preventDefault)
 import DOM.File.File (name)
@@ -15,10 +16,12 @@ import DOM.HTML.Event.DragEvent (dataTransfer)
 import DOM.HTML.Event.Types (DragEvent)
 import DOM.HTML.HTMLTextAreaElement (setValue)
 import DOM.HTML.Types (HTMLAudioElement, HTMLElement, HTMLTextAreaElement)
+import DOM.Node.Types (Element)
 import Data.Array (foldM)
 import Data.Function.Uncurried (Fn1, Fn2, runFn1, runFn2)
 import Data.Int (ceil)
 import Data.Maybe (Maybe(..))
+import HTML (setInnerHTML)
 import Unsafe.Coerce (unsafeCoerce)
 
 newtype URL = URL String
@@ -51,8 +54,6 @@ foreign import toFileArrayImpl :: Fn1 FileList (Array File)
 toFileArray :: FileList -> Array File
 toFileArray = runFn1 toFileArrayImpl
 
--- foreign import dropHandlerImpl :: forall e. DragEvent -> Eff (Effects e) Unit
-
 m3uStart :: String
 m3uStart = "#EXTM3U\n"
 
@@ -74,10 +75,12 @@ filesToM3U event = do
     Nothing -> pure ""
 
 
-
-dropHandler :: forall e. HTMLTextAreaElement -> Event -> Eff (Effects e) Unit
-dropHandler textarea e = do
+dropHandler :: forall e. HTMLTextAreaElement -> Element -> Event -> Eff (Effects e) Unit
+dropHandler textarea errorElement e = do
   preventDefault e
-  void $ runAff logShow (\str -> do
+  void $ runAff (\err -> do
+    setInnerHTML errorElement (message err)
+  ) (\str -> do
     setValue str textarea
+    setInnerHTML errorElement ""
   ) $ filesToM3U (unsafeCoerce e)

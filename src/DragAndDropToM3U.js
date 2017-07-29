@@ -17,6 +17,11 @@ exports.injectAudioHiddenImpl = function injectAudioHiddenImpl(url, file) {
 // AudioElement -> Aff (dom :: DOM) Duration
 exports.audioDurationImpl = function audioDurationImpl(audio) {
   return function(success, fail) {
+
+    if (audio.attributes.type.value.indexOf('audio') !== 0) {
+      fail(new Error("The file is not an audio file."));
+    }
+
     if (!isNaN(audio.duration)) {
       success(audio.duration);
     } else {
