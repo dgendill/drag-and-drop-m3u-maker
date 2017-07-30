@@ -18,9 +18,10 @@ import Unsafe.Coerce (unsafeCoerce)
 foreign import readyImpl :: forall e a. Fn1 (Eff (dom :: DOM | e) a) Unit
 foreign import getElementsByClassNameImpl :: forall a. Fn3 String (a -> Maybe a) (Maybe a) (Maybe (Array Element))
 foreign import getElementByIdImpl :: forall a. Fn3 String (a -> Maybe a) (Maybe a) (Maybe Element)
-foreign import setInnerHTMLImpl :: forall a. Fn2 String Element Unit
-foreign import prependChildImpl :: forall a. Fn2 Element Element Unit
-foreign import setDataAttributeImpl :: forall a. Fn2 Element String Unit
+foreign import setInnerHTMLImpl :: Fn2 String Element Unit
+foreign import prependChildImpl :: Fn2 Element Element Unit
+foreign import setDataAttributeImpl :: Fn2 Element String Unit
+foreign import removeImpl :: Fn1 Element Unit
 
 document :: forall e. Eff (dom :: DOM | e) Document
 document = window >>= Window.document >>= htmlDocumentToDocument >>> pure
@@ -54,3 +55,6 @@ prependChild p c = pure $ runFn2 prependChildImpl p c
 
 setDataAttribute :: forall e. Element -> String -> Eff (dom :: DOM | e) Unit
 setDataAttribute e s = pure $ runFn2 setDataAttributeImpl e s
+
+remove :: forall e. Element -> Eff (dom :: DOM | e) Unit
+remove e = pure $ runFn1 removeImpl e

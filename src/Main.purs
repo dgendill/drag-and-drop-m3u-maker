@@ -2,20 +2,25 @@ module Main where
 
 import Prelude
 
-import Control.Monad.Aff (runAff)
+import Control.Coroutine (Producer, await, pullFrom, runProcess)
+import Control.Coroutine.Aff (produce, produce')
+import Control.Monad.Aff (Aff, attempt, launchAff, runAff)
+import Control.Monad.Aff.AVar (AVAR)
 import Control.Monad.Eff (Eff)
+import Control.Monad.Eff.Class (liftEff)
 import Control.Monad.Eff.Console (CONSOLE, log)
 import Control.Monad.Eff.Console (error) as Console
 import Control.Monad.Eff.Exception (EXCEPTION, catchException, error, throwException)
 import Control.Monad.Eff.Exception (message)
 import Control.Monad.Eff.Exception.Unsafe (unsafeThrowException)
-import Control.Monad.State.Class (get)
+import Control.Monad.Rec.Class (forever)
+import Control.Monad.State.Class (get, modify, put)
 import Control.Monad.State.Trans (StateT(..), execStateT, runStateT)
 import Control.Monad.Trans.Class (lift)
 import DOM (DOM)
 import DOM.Event.Event (preventDefault)
 import DOM.Event.EventTarget (addEventListener, eventListener)
-import DOM.Event.Types (Event, EventType(..))
+import DOM.Event.Types (Event, EventTarget, EventType(..))
 import DOM.File.Types (File)
 import DOM.HTML (window)
 import DOM.HTML.HTMLTextAreaElement (setValue)
@@ -25,19 +30,20 @@ import DOM.HTML.Window (document)
 import DOM.Node.NonElementParentNode (getElementById)
 import DOM.Node.Types (Document, Element, ElementId(..), documentToEventTarget, documentToNonElementParentNode, elementToEventTarget)
 import Data.Array (unsafeIndex)
-import Data.Function.Uncurried (Fn1, Fn2, runFn1, runFn2)
+import Data.Either (Either(..))
+import Data.Function.Uncurried (Fn1, Fn2, Fn3, runFn1, runFn2, runFn3)
 import Data.Maybe (Maybe(..))
 import Data.Maybe (fromJust)
 import Data.String (joinWith)
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
 import Data.Validation.Semigroup (V, invalid, unV)
-import DragAndDropToM3U (dropHandler, foldToM3U, m3uDropHandler)
+import DragAndDropToM3U (dropHandler, eventToFiles, fileUrl, foldToM3U, m3uDropHandler)
 import HTML (setInnerHTML)
 import Partial.Unsafe (unsafePartial)
 import Unsafe.Coerce (unsafeCoerce)
 
-type EffRows e = (dom :: DOM, console :: CONSOLE, exception :: EXCEPTION | e )
+type EffRows e = (dom :: DOM, console :: CONSOLE, exception :: EXCEPTION, avar :: AVAR | e )
 type Effects e r = Eff (EffRows e)  r
 
 windowLoad :: forall e. Effects e Unit -> Effects e Unit
@@ -51,16 +57,45 @@ main = run {
   ops : defaultFunctionalityConfig
 }
 
-run :: forall e. Config (EffRows e) Unit -> Effects e Unit
+type AppState = { elements :: (ElementConfig Element), files :: Array File }
+type AppEffects e = StateT AppState (Aff (EffRows e))
+
+dropEvents :: forall e. EventType -> EventTarget -> Producer Event (AppEffects e) Unit
+dropEvents eventType target = produce' \emit ->
+  addEventListener eventType (eventListener (emit <<< Left))
+    false
+    target
+
+setupListener :: forall e. Element -> (Array File -> AppEffects e Unit) -> AppEffects e Unit
+setupListener dropzone ondrop = runProcess $ consumer `pullFrom` producer
+  where
+  producer =
+    dropEvents
+      (EventType "drop")
+      (elementToEventTarget dropzone)
+  consumer = forever $ lift <<< (\event -> do
+    liftEff $ preventDefault event
+    let files = eventToFiles (unsafeCoerce event)
+    ondrop files
+  ) =<< await
+
+run :: forall e. Config e Unit -> Effects e Unit
 run config = windowLoad $ do
   doc <- DHT.htmlDocumentToDocument <$> (window >>= document)
   ec@{ dropzone, textarea, errors } <- validateElementConfig config.elements doc
-  addEventListener (EventType "drop") (eventListener
-    (\event -> (execStateT (config.ops.processFiles event) ec)))
-    false
-    (elementToEventTarget dropzone)
+
+  void $ runAff
+    (const $ pure unit)
+    (const $ pure unit) $ { elements : ec, files : [] } # execStateT do    
+    lift $ liftEff $ addEventListener
+      (EventType "dragover")
+      (eventListener preventDefault)
+      false
+      (documentToEventTarget doc)
+
+    setupListener dropzone config.ops.processFiles
+
   
-  addEventListener (EventType "dragover") (eventListener preventDefault) false (documentToEventTarget doc)
   log "Running..."
 
 type Config e a = {
@@ -69,7 +104,7 @@ type Config e a = {
 }
 
 type FunctionalityConfig e a = {
-  processFiles :: Event -> StateT (ElementConfig Element) (Eff e) a
+  processFiles :: Array File -> AppEffects e a
 }
 
 type ElementConfig a = {
@@ -78,38 +113,36 @@ type ElementConfig a = {
   errors :: a
 }
 
-extendOps :: forall e. FunctionalityConfig (EffRows e) Unit -> FunctionalityConfig (EffRows e) Unit
+extendOps :: forall e. FunctionalityConfig e Unit -> FunctionalityConfig e Unit
 extendOps ext = {
-  processFiles : (\event -> do
-    defaultFunctionalityConfig.processFiles event
-    ext.processFiles event
+  processFiles : (\files -> do
+    defaultFunctionalityConfig.processFiles files
+    ext.processFiles files
   )
 }
 
-customFunction :: forall e. (Fn2 (ElementConfig Element) (Array File) Unit) -> FunctionalityConfig (dom :: DOM, console :: CONSOLE | e) Unit
+customFunction :: forall e. (Fn3 (ElementConfig Element) (Array File) (Array File) Unit) -> FunctionalityConfig e Unit
 customFunction fn = {
-  processFiles : (\event -> do
-    ec@{ dropzone, textarea, errors } <- get
-    lift $ catchException (\err ->
-      Console.error (message err)
-    ) $ void $ runAff
-      (const $ pure unit)
-      (const $ pure unit)
-      (dropHandler event ((\files -> pure $ runFn2 fn ec files )))
+  processFiles : (\newFiles -> do
+    { elements, files } <- get
+    void $ lift $ pure $ runFn3 fn elements newFiles files
   )
 }
 
-defaultFunctionalityConfig :: forall e. FunctionalityConfig (console :: CONSOLE, dom :: DOM | e) Unit
+defaultFunctionalityConfig :: forall e. FunctionalityConfig e Unit
 defaultFunctionalityConfig = {
-  processFiles : (\event -> do
-    { dropzone, textarea, errors } <- get
-    let errorElement = errors
-    lift $ void $ runAff  (\err -> do
-      setInnerHTML errorElement (message err)
-    ) (\str -> do
-      setValue str (unsafeCoerce textarea)
-      setInnerHTML errorElement ""
-    ) $ m3uDropHandler (unsafeCoerce textarea) errors event
+  processFiles : (\newFiles -> do
+    { elements, files } <- get
+    let errorElement = elements.errors    
+    let allFiles = files <> newFiles  
+    m3u <- lift $ attempt $ foldToM3U allFiles
+    case m3u of
+      Left err -> liftEff $ setInnerHTML errorElement (message err)
+      Right str -> do
+        liftEff $ setValue str (unsafeCoerce elements.textarea)
+        liftEff $ setInnerHTML errorElement ""
+        modify (\s -> (s { files = allFiles }))
+        
   )
 }
 

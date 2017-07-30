@@ -5,7 +5,7 @@
     <title>Drag and Drop Audio to M3Ur</title>
     <script src="jsmediatags.js"></script>
     <script src="app.js"></script>
-    <script>
+    <script type="text/javascript">
       document.addEventListener('DOMContentLoaded', function() {
         PS.Main.run({
           elements : {
@@ -13,10 +13,10 @@
             errors : "errors",
             textarea : "m3u"
           },
-          ops : PS.Main.extendOps(PS.Main.customFunction(function(elements, files) {
+          ops : PS.Main.extendOps(PS.Main.customFunction(function(elements, files, allFiles) {
             // Extend the default functionality with a
             // logging "plugin"
-            console.log(elements, files);            
+            console.log(elements, files, allFiles);            
           }))
           // ops : PS.Main.defaultFunctionalityConfig
         })();

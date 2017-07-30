@@ -26,10 +26,10 @@ import Data.Array (foldM, fromFoldable, head, tail)
 import Data.Foldable (class Foldable)
 import Data.Function.Uncurried (Fn1, Fn2, runFn1, runFn2)
 import Data.Int (ceil)
-import Data.Maybe (Maybe(..))
+import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Monoid (class Monoid, mempty)
 import Data.Tuple (Tuple(..))
-import HTML (setInnerHTML)
+import HTML (setInnerHTML, remove)
 import Unsafe.Coerce (unsafeCoerce)
 
 newtype URL = URL String
@@ -75,8 +75,14 @@ foldFiles fn seed f = tailRec go { acc : seed, val : (fromFoldable f) }
 foldToM3U :: forall e. Array File -> Aff (Effects e) String
 foldToM3U files = append m3uStart <$> foldM (\acc file -> do
   let url = fileUrl file
-  audioElement <- liftEff $ injectAudioHidden (fileUrl file) file
-  duration <- audioDuration audioElement
+  audioElement <- liftEff $ injectAudioHidden url file
+  duration <-  audioDuration audioElement
+  liftEff $ remove (unsafeCoerce audioElement)
+
+  -- let duration = 10.0
+  -- let title = "t"
+  -- let artist = "a"
+  -- let filename = "fn"
   (AudioTags {title, artist, filename}) <- audioTags file
   pure $ acc <>
     "#EXTINF:" <> (show $ ceil duration) <> ", " <> artist <> " - " <> title <> "\n" <>
@@ -86,12 +92,11 @@ foldToM3U files = append m3uStart <$> foldM (\acc file -> do
 m3uStart :: String
 m3uStart = "#EXTM3U\n"
 
+eventToFiles :: DragEvent -> Array File
+eventToFiles event = fromMaybe [] $ toFileArray <$> (files $ dataTransfer event)
+
 execFiles :: forall e a. (Monoid a) => DragEvent -> (Array File -> Aff (dom :: DOM | e) a) -> Aff (dom :: DOM | e) a
-execFiles event fn = do
-  let mfiles = toFileArray <$> (files $ dataTransfer event)
-  case mfiles of
-    Just files -> fn files
-    Nothing -> pure mempty
+execFiles event fn = fn $ eventToFiles event
 
 dropHandler :: forall e a. (Monoid a) => Event -> (Array File -> Aff (dom :: DOM | e) a) -> Aff (dom :: DOM | e) a
 dropHandler e fn = do

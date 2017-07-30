@@ -36,4 +36,6 @@ exports.setDataAttributeImpl = function(element, attr) {
   element.setAttribute('data', attr);
 }
 
-
+exports.removeImpl = function(element) {
+  element.remove();
+}

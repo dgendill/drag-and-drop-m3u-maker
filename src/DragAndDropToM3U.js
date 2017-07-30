@@ -20,15 +20,17 @@ exports.audioDurationImpl = function audioDurationImpl(audio) {
 
     if (audio.attributes.type.value.indexOf('audio') !== 0) {
       fail(new Error("The file is not an audio file."));
+      return;
     }
 
     if (!isNaN(audio.duration)) {
       success(audio.duration);
     } else {
+
       var timeoutid = window.setTimeout(function() {
         audio.removeEventListener('durationchange', onchange);
         fail(new Error("It took too long to get the audio's duration."));
-      }, 10000);
+      }, 6000);
 
       var onchange = function() {
         clearTimeout(timeoutid);
@@ -44,23 +46,23 @@ exports.audioDurationImpl = function audioDurationImpl(audio) {
 // File -> Aff () AudioTags
 exports.audioTagsImpl = function audioTagsImpl(file) {
   return function(success, fail) {
-    var data = {};
+    var filename = file.name;
     jsmediatags.read(file, {
       onSuccess: function(tag) {
-
+        var data = {};
         if (tag.tags.artist) {
           data.artist = tag.tags.artist;
         } else {
-          fail(new Error(file.name + ' is missing artist tag.'));
+          fail(new Error(filename + ' is missing artist tag.'));
         }
 
         if (tag.tags.title) {
           data.title = tag.tags.title;
         } else {
-          fail(new Error(file.name + ' is missing title tag.'));
+          fail(new Error(filename + ' is missing title tag.'));
         }
 
-        data.filename = file.name;
+        data.filename = filename;
 
         success(data);
 
@@ -74,13 +76,9 @@ exports.audioTagsImpl = function audioTagsImpl(file) {
 }
 
 exports.toFileArrayImpl = function(fileList) {
-  return Array.prototype.reduce.apply(
-    fileList, [
-      function(acc, file) {
-        acc.push(file);
-        return acc;
-      },
-      []
-    ]
-  )
+  var acc = [];
+  for (var i = 0; i < fileList.length; i++) {
+    acc[i] = fileList.item(i);
+  }
+  return acc;
 }
