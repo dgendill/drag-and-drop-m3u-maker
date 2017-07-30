@@ -13,10 +13,10 @@
             errors : "errors",
             textarea : "m3u"
           },
-          ops : PS.Main.extendOps(PS.Main.customFunction(function(event, elements) {
+          ops : PS.Main.extendOps(PS.Main.customFunction(function(elements, files) {
             // Extend the default functionality with a
             // logging "plugin"
-            console.log(event, elements);            
+            console.log(elements, files);            
           }))
           // ops : PS.Main.defaultFunctionalityConfig
         })();
