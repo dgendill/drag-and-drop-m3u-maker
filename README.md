@@ -8,9 +8,12 @@ You can inject the m3u maker into any page by including [jsmediatags](https://gi
 
 ```
 PS.Main.run({
-  dropzone : ElementIDString,
-  errors : ElementIDString,
-  textarea : ElementIDString
+  elements : {
+    dropzone : ElementIDString,
+    errors : ElementIDString,
+    textarea : ElementIDString
+  },
+  ops : PS.Main.defaultFunctionalityConfig
 })();
 ```
 
@@ -18,11 +21,14 @@ For example:
 
 ```
 PS.Main.run({
-  // Set the dropzone to element with id #dropzone
-  dropzone : "dropzone",
-  // Set where errors get displayed.  Elemenet with id #errors
-  errors : "errors",
-  // Set where the m3u is displayed. Element with id #m3u
-  textarea : "m3u",
+  elements : {
+    // Set the dropzone to element with id #dropzone
+    dropzone : "dropzone",
+    // Set where errors get displayed.  Elemenet with id #errors
+    errors : "errors",
+    // Set where the m3u is displayed. Element with id #m3u
+    textarea : "m3u",
+  },
+  ops : PS.Main.defaultFunctionalityConfig
 })();
 ```
