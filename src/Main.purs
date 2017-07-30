@@ -6,6 +6,7 @@ import Control.Coroutine (Producer, await, pullFrom, runProcess)
 import Control.Coroutine.Aff (produce, produce')
 import Control.Monad.Aff (Aff, attempt, launchAff, runAff)
 import Control.Monad.Aff.AVar (AVAR)
+import Control.Monad.Aff.Class (liftAff)
 import Control.Monad.Eff (Eff)
 import Control.Monad.Eff.Class (liftEff)
 import Control.Monad.Eff.Console (CONSOLE, log)
@@ -38,7 +39,7 @@ import Data.String (joinWith)
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
 import Data.Validation.Semigroup (V, invalid, unV)
-import DragAndDropToM3U (dropHandler, eventToFiles, fileUrl, foldToM3U, m3uDropHandler)
+import DragAndDropToM3U (AudioDetails(..), eventToFiles, fileUrl, filesToAudioDetails, foldToM3U)
 import HTML (setInnerHTML)
 import Partial.Unsafe (unsafePartial)
 import Unsafe.Coerce (unsafeCoerce)
@@ -54,10 +55,10 @@ windowLoad fn = do
 main :: forall e. Effects e Unit
 main = run {
   elements : defaultElementConfig,
-  ops : defaultFunctionalityConfig
+  ops : m3uTextareaFunctionality
 }
 
-type AppState = { elements :: (ElementConfig Element), files :: Array File }
+type AppState = { elements :: (ElementConfig Element), files :: Array AudioDetails }
 type AppEffects e = StateT AppState (Aff (EffRows e))
 
 dropEvents :: forall e. EventType -> EventTarget -> Producer Event (AppEffects e) Unit
@@ -66,7 +67,7 @@ dropEvents eventType target = produce' \emit ->
     false
     target
 
-setupListener :: forall e. Element -> (Array File -> AppEffects e Unit) -> AppEffects e Unit
+setupListener :: forall e. Element -> (Array AudioDetails -> AppEffects e Unit) -> AppEffects e Unit
 setupListener dropzone ondrop = runProcess $ consumer `pullFrom` producer
   where
   producer =
@@ -75,8 +76,11 @@ setupListener dropzone ondrop = runProcess $ consumer `pullFrom` producer
       (elementToEventTarget dropzone)
   consumer = forever $ lift <<< (\event -> do
     liftEff $ preventDefault event
-    let files = eventToFiles (unsafeCoerce event)
-    ondrop files
+    let newFiles = eventToFiles (unsafeCoerce event)
+    { elements, files } <- get
+    details <- liftAff $ filesToAudioDetails newFiles
+    let allFiles = files <> details
+    ondrop details
   ) =<< await
 
 run :: forall e. Config e Unit -> Effects e Unit
@@ -104,7 +108,7 @@ type Config e a = {
 }
 
 type FunctionalityConfig e a = {
-  processFiles :: Array File -> AppEffects e a
+  processFiles :: Array AudioDetails -> AppEffects e a
 }
 
 type ElementConfig a = {
@@ -112,6 +116,8 @@ type ElementConfig a = {
   textarea :: a,
   errors :: a
 }
+
+defaultFunctionalityConfig = m3uTextareaFunctionality
 
 extendOps :: forall e. FunctionalityConfig e Unit -> FunctionalityConfig e Unit
 extendOps ext = {
@@ -121,7 +127,7 @@ extendOps ext = {
   )
 }
 
-customFunction :: forall e. (Fn3 (ElementConfig Element) (Array File) (Array File) Unit) -> FunctionalityConfig e Unit
+customFunction :: forall e. (Fn3 (ElementConfig Element) (Array AudioDetails) (Array AudioDetails) Unit) -> FunctionalityConfig e Unit
 customFunction fn = {
   processFiles : (\newFiles -> do
     { elements, files } <- get
@@ -129,8 +135,8 @@ customFunction fn = {
   )
 }
 
-defaultFunctionalityConfig :: forall e. FunctionalityConfig e Unit
-defaultFunctionalityConfig = {
+m3uTextareaFunctionality :: forall e. FunctionalityConfig e Unit
+m3uTextareaFunctionality = {
   processFiles : (\newFiles -> do
     { elements, files } <- get
     let errorElement = elements.errors    

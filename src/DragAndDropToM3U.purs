@@ -26,6 +26,7 @@ import Data.Array (foldM, fromFoldable, head, tail)
 import Data.Foldable (class Foldable)
 import Data.Function.Uncurried (Fn1, Fn2, runFn1, runFn2)
 import Data.Int (ceil)
+import Data.String (joinWith)
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Monoid (class Monoid, mempty)
 import Data.Tuple (Tuple(..))
@@ -38,6 +39,14 @@ newtype AudioTags = AudioTags {
   title :: String,
   artist :: String,
   filename :: String
+}
+
+newtype AudioDetails = AudioDetails {
+  title :: String,
+  artist :: String,
+  filename :: String,
+  duration :: Number,
+  file :: File
 }
 
 type Effects e = (dom :: DOM, console :: CONSOLE | e)
@@ -72,22 +81,32 @@ foldFiles fn seed f = tailRec go { acc : seed, val : (fromFoldable f) }
     Tuple (Just h) Nothing  -> Done $ fn a h
     _ -> Done a
 
-foldToM3U :: forall e. Array File -> Aff (Effects e) String
-foldToM3U files = append m3uStart <$> foldM (\acc file -> do
+filesToAudioDetails :: forall e. Array File -> Aff (Effects e) (Array AudioDetails)
+filesToAudioDetails files = foldM (\acc file -> do
   let url = fileUrl file
   audioElement <- liftEff $ injectAudioHidden url file
   duration <-  audioDuration audioElement
   liftEff $ remove (unsafeCoerce audioElement)
+  (AudioTags tags) <- audioTags file
+  pure $ acc <> [AudioDetails {
+    title : tags.title,
+    artist : tags.artist,
+    filename : tags.filename,
+    duration : duration,
+    file : file
+  }]
+) [] files
 
-  -- let duration = 10.0
-  -- let title = "t"
-  -- let artist = "a"
-  -- let filename = "fn"
-  (AudioTags {title, artist, filename}) <- audioTags file
-  pure $ acc <>
-    "#EXTINF:" <> (show $ ceil duration) <> ", " <> artist <> " - " <> title <> "\n" <>
-    (name file) <> "\n"
-) "" files
+audioDetailsToExtinf :: AudioDetails -> String
+audioDetailsToExtinf (AudioDetails d) =
+  "#EXTINF:" <> (show $ ceil d.duration) <> ", " <> d.artist <> " - " <> d.title <> "\n" <>
+    d.filename
+
+--     (name file)
+
+foldToM3U :: forall e. Array AudioDetails -> Aff (Effects e) String
+foldToM3U details = do
+  pure $ m3uStart <> (joinWith "\n" $ map audioDetailsToExtinf details)
 
 m3uStart :: String
 m3uStart = "#EXTM3U\n"
@@ -98,12 +117,12 @@ eventToFiles event = fromMaybe [] $ toFileArray <$> (files $ dataTransfer event)
 execFiles :: forall e a. (Monoid a) => DragEvent -> (Array File -> Aff (dom :: DOM | e) a) -> Aff (dom :: DOM | e) a
 execFiles event fn = fn $ eventToFiles event
 
-dropHandler :: forall e a. (Monoid a) => Event -> (Array File -> Aff (dom :: DOM | e) a) -> Aff (dom :: DOM | e) a
-dropHandler e fn = do
-  liftEff $ preventDefault e
-  execFiles (unsafeCoerce e) fn
+-- dropHandler :: forall e a. (Monoid a) => Event -> (Array File -> Aff (dom :: DOM | e) a) -> Aff (dom :: DOM | e) a
+-- dropHandler e fn = do
+--   liftEff $ preventDefault e
+--   execFiles (unsafeCoerce e) fn
 
-m3uDropHandler :: forall e. HTMLTextAreaElement -> Element -> Event -> Aff (Effects e) String
-m3uDropHandler textarea errorElement e = do
-  dropHandler e foldToM3U
+-- m3uDropHandler :: forall e. HTMLTextAreaElement -> Element -> Event -> Aff (Effects e) String
+-- m3uDropHandler textarea errorElement e = do
+--   dropHandler e foldToM3U
 
