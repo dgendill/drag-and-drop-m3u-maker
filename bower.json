@@ -18,6 +18,7 @@
     "purescript-prelude": "^3.0.0",
     "purescript-dom": "^4.5.0",
     "purescript-aff": "^3.1.0",
-    "purescript-validation": "^3.1.0"
+    "purescript-validation": "^3.1.0",
+    "purescript-folds": "^3.1.0"
   }
 }

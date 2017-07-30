@@ -8,9 +8,17 @@
     <script>
       document.addEventListener('DOMContentLoaded', function() {
         PS.Main.run({
-          dropzone : "dropzone",
-          errors : "errors",
-          textarea : "m3u",
+          elements : {
+            dropzone : "dropzone",
+            errors : "errors",
+            textarea : "m3u"
+          },
+          ops : PS.Main.extendOps(PS.Main.customFunction(function(event, elements) {
+            // Extend the default functionality with a
+            // logging "plugin"
+            console.log(event, elements);            
+          }))
+          // ops : PS.Main.defaultFunctionalityConfig
         })();
       });
 

@@ -1,0 +1,19 @@
+{
+  "name": "drag-and-drop-m3u-maker",
+  "version": "1.0.0",
+  "description": "[Available here](http://htmlpreview.github.io/?http://github.com/dgendill/drag-and-drop-m3u-maker/blob/master/index.html) or checkout the repo.",
+  "main": "app.js",
+  "scripts": {
+    "build": "pulp --watch build --skip-entry-point --to app.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dgendill/drag-and-drop-m3u-maker.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/dgendill/drag-and-drop-m3u-maker/issues"
+  },
+  "homepage": "https://github.com/dgendill/drag-and-drop-m3u-maker#readme"
+}
